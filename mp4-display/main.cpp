@@ -89,7 +89,7 @@ PcustomInfo parseJson(std::string& str){
 
     return info;
 }
-
+int video_frame_count = 0;
 bool proc()
 {
     Mp4ReaderInterface::Frame frame;
@@ -105,11 +105,14 @@ bool proc()
         if(frame.frame_data_len == 6){
             return true;
         }
+
         if(decode_){
             cv::Mat mat;
+            video_frame_count++;
             if(decode_->push(frame, mat) != 0){
                 printf("decode failed\n");
-                return false;
+                return true;
+                // return false;
             }
 
             if(mat.data)
@@ -122,9 +125,9 @@ bool proc()
                 }
                 cv::imshow("window", mat);
                 cv::waitKey(frame.duration * 1000 / time_base);
-                if(show_frame_count){
-                    cv::waitKey(0);
-                }
+                // if(show_frame_count){
+                //     cv::waitKey(0);
+                // }
             }
         }
     }
@@ -135,7 +138,7 @@ bool proc()
         if(show_info){
             show_frame_count = 2;
             for(auto target : show_info->target_list){
-                printf("target type:%s confidence:%s x y w h:%d %d %d %d\n", target.target_type.c_str(), target.confidence.c_str(), target.x, target.y, target.w, target.h);
+                printf("target video_frame_count:%d type:%s confidence:%s x y w h:%d %d %d %d\n", video_frame_count, target.target_type.c_str(), target.confidence.c_str(), target.x, target.y, target.w, target.h);
             }            
         }
     }
