@@ -75,13 +75,13 @@ int Decoder::push(Ifai::Ifmp4::Mp4ReaderInterface::Frame& src_packet, cv::Mat& m
     pkt->pts = src_packet.pts;
     pkt->stream_index = video_stream_idx;
 
-    printf("packet stream_index:%d\n", pkt->stream_index);
-    printf("packet size:%d\n", pkt->size);
-    printf("packet flags:%d\n", pkt->flags);
-    printf("packet duration:%lu\n", pkt->duration);
-    printf("packet pos:%lu\n", pkt->pos);
-    printf("packet pts:%lu\n", pkt->pts);
-    printf("packet dts:%lu\n", pkt->dts);       
+    // printf("packet stream_index:%d\n", pkt->stream_index);
+    // printf("packet size:%d\n", pkt->size);
+    // printf("packet flags:%d\n", pkt->flags);
+    // printf("packet duration:%lu\n", pkt->duration);
+    // printf("packet pos:%lu\n", pkt->pos);
+    // printf("packet pts:%lu\n", pkt->pts);
+    // printf("packet dts:%lu\n", pkt->dts);       
     int ret = decode_packet(video_dec_ctx, pkt, frame);
     if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)){
         return 0;

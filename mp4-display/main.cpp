@@ -10,11 +10,35 @@
 #include <opencv4/opencv2/core/core.hpp>
 #include <opencv4/opencv2/highgui.hpp>
 #include <opencv4/opencv2/opencv.hpp>
+#include <jsoncpp/json/json.h>
+
 std::shared_ptr<Ifai::Ifmp4::Mp4ReaderInterface> reader_;
 std::shared_ptr<Ifai::Decoder> decode_;
+unsigned int time_base = 90000;
 FILE* fp_ = NULL;
 
 int once = 1;
+
+struct target
+{
+    int x;
+    int y;
+    int w;
+    int h;
+    std::string confidence;
+    std::string target_type;
+};
+
+
+struct customInfo{
+    int channel_id;
+    std::vector<target> target_list;
+};
+
+typedef std::shared_ptr<customInfo> PcustomInfo;
+
+PcustomInfo show_info;
+int show_frame_count = 0;
 
 using namespace Ifai;
 using namespace Ifmp4;
@@ -27,7 +51,7 @@ bool writeFile(void* data, unsigned lenght, std::string file_name){
         auto write_len = fwrite(data, 1, lenght, fp);
         if (write_len != lenght)
         {
-            printf("fwrite failed, lenght:%u ret:%d", lenght, write_len);
+            printf("fwrite failed, lenght:%u ret:%lu", lenght, write_len);
         }
 
         fclose(fp);
@@ -37,20 +61,43 @@ bool writeFile(void* data, unsigned lenght, std::string file_name){
     return true;
 }
 
+PcustomInfo parseJson(std::string& str){
+    Json::Reader reader;
+    Json::Value root;
+    if (reader.parse(str, root) == false){
+        printf("json parse failed\n");
+        return nullptr;
+    }
+
+    PcustomInfo info = std::make_shared<customInfo>();
+    try{
+        info->channel_id = root["channel_id"].asInt();
+        for(auto node : root["target"]){
+            target t;
+            t.target_type = node["target_type"].asString();
+            t.confidence = node["confidence"].asString();
+            t.x = node["x"].asInt();
+            t.y = node["y"].asInt();
+            t.w = node["w"].asInt();
+            t.h = node["h"].asInt();   
+            info->target_list.push_back(t);
+        }
+    }catch(std::exception &e){
+        fprintf(stderr, "%s", e.what());
+        return nullptr;
+    }
+
+    return info;
+}
+
 bool proc()
 {
-    static int mp4v2_frame = 0;
     Mp4ReaderInterface::Frame frame;
     auto ret = reader_->ReadFrame(frame);
     if (ret != Mp4ReaderInterface::kOk)
     {
         printf("mp4 read frame failed, ret:%d\n", ret); 
         return false;
-    }
-
-    if(!mp4v2_frame){
-        writeFile(frame.frame_data, frame.frame_data_len, "mp4v2_frame");
-        mp4v2_frame = 1;
     }
 
     if (frame.type == FrameType::video)
@@ -67,16 +114,30 @@ bool proc()
 
             if(mat.data)
             {
-                cv::rectangle(mat, cv::Point(100, 150), cv::Point(250, 300), cv::Scalar(0, 0, 255),4);
+                if(show_frame_count && show_info){
+                    for(auto target : show_info->target_list){
+                        cv::rectangle(mat, cv::Point(target.x, target.y), cv::Point(target.x + target.w, target.y + target.h), cv::Scalar(0, 0, 255),3);
+                    }
+                    show_frame_count--;
+                }
                 cv::imshow("window", mat);
-                cv::waitKey(30);
+                cv::waitKey(frame.duration * 1000 / time_base);
+                if(show_frame_count){
+                    cv::waitKey(0);
+                }
             }
         }
     }
     else
     {
         std::string str(reinterpret_cast<char *>(frame.frame_data), frame.frame_data_len);
-        printf("%s\n", str.c_str());
+        show_info = parseJson(str);
+        if(show_info){
+            show_frame_count = 2;
+            for(auto target : show_info->target_list){
+                printf("target type:%s confidence:%s x y w h:%d %d %d %d\n", target.target_type.c_str(), target.confidence.c_str(), target.x, target.y, target.w, target.h);
+            }            
+        }
     }
 
     return true;
@@ -89,8 +150,9 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    cv::namedWindow("window", 1);
-    cv::imshow("window", 0);
+    cv::namedWindow("window", 0);
+    cv::resizeWindow("window", 640, 480);
+    // cv::imshow("window", 0);
     reader_ = Mp4ReaderInterface::CreateNew();
     decode_ = std::make_shared<Decoder>();
     std::string path = argv[1];
