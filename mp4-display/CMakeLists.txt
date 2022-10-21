@@ -15,20 +15,31 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-project(demo)
+project(mp4-player)
 file(GLOB SRC_FILE "*.cpp")
 
-find_package( OpenCV REQUIRED )
+find_package(OpenCV REQUIRED)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../mp4v2/include
 )
 
 link_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../mp4v2/lib
-)
+    )
+    
+add_executable(${PROJECT_NAME} ${SRC_FILE})
+    
+target_link_libraries(${PROJECT_NAME} jsoncpp mp4Reader mp4v2 avformat avcodec swresample swscale avutil -llzma  -lbz2 -lz -lm pthread)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} )
 
-add_executable(demo ${SRC_FILE})
 
-target_link_libraries(demo jsoncpp mp4Reader mp4v2 avformat avcodec swresample swscale avutil -llzma  -lbz2 -lz -lm pthread)
+set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
+SET(FUNC_INSTALL_DIR ../../output)
 
-target_link_libraries( demo ${OpenCV_LIBS} )
+INSTALL(TARGETS ${PROJECT_NAME}
+		CONFIGURATIONS Release
+		DESTINATION ${FUNC_INSTALL_DIR})
+
+INSTALL(FILES README.md 
+        CONFIGURATIONS Release        
+        DESTINATION ${FUNC_INSTALL_DIR})
