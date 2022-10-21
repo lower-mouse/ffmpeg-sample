@@ -236,6 +236,7 @@ int mp4info_to_avcode_parameter(Ifai::Ifmp4::Mp4ReaderInterface::PMp4Info info, 
 
     int extradata_len = 8 + info->sps.size() + 1 + 2 + info->sps.size();
     codecParameters->extradata = (uint8_t*)av_mallocz(extradata_len);
+    memset(codecParameters->extradata, 0, extradata_len);
     codecParameters->extradata_size = extradata_len;
     codecParameters->extradata[0] = 0x01;
     codecParameters->extradata[1] = info->sps[1];
@@ -250,15 +251,20 @@ int mp4info_to_avcode_parameter(Ifai::Ifmp4::Mp4ReaderInterface::PMp4Info info, 
     for (i=0;i<tmp;i++)
         codecParameters->extradata[8+i] = info->sps[i];
     codecParameters->extradata[8+tmp] = 0x01;
+
     int tmp2 = info->pps.size();   
     codecParameters->extradata[8+tmp+1] = (tmp2 >> 8) & 0x00ff;
     codecParameters->extradata[8+tmp+2] = tmp2 & 0x00ff;
     for (i=0;i<tmp2;i++)
-        codecParameters->extradata[8+tmp+3+i] = info->pps[4+i];    
+        codecParameters->extradata[8+tmp+3+i] = info->pps[i];    
+
 }
 
 int Decoder::init(Ifai::Ifmp4::Mp4ReaderInterface::PMp4Info mp4_info){
     av_register_all();
+
+    printf("av_version_info :%s\n", av_version_info());
+    printf("avcodec_version :%d\n", avcodec_version());    
     if(!mp4_info){
         printf("mp4 info is null\n");
         return -1;
@@ -318,6 +324,9 @@ err_:
 int Decoder::init(std::string file){
     int ret = 0;
     av_register_all();
+
+    printf("av_version_info :%s\n", av_version_info());
+    printf("avcodec_version :%d\n", avcodec_version());
     /* open input file, and allocate format context */
     if (avformat_open_input(&fmt_ctx, file.c_str(), NULL, NULL) < 0) {
         fprintf(stderr, "Could not open source file %s\n", file.c_str());
