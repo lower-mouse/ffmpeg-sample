@@ -3,16 +3,20 @@
 
 #include <memory>
 #include <string>
+#include <map>
 
 namespace Ifai {
 namespace Ifmp4 {
 
+
 enum FrameType{
     video = 0,
     audio,
-    custom,
+    eventInfo,
+    gpsInfo,
 };
 
+const std::map<FrameType, std::string> g_custom_frame_map = {{eventInfo, "MINE"}, {gpsInfo, "MGPS"}};
 class Mp4ReaderInterface {
 public:
     Mp4ReaderInterface();
@@ -63,6 +67,7 @@ public:
     virtual PMp4Info GetMp4Info() = 0;
     virtual ERRNO ReadVideoFrame(Frame& frame) = 0;
     virtual ERRNO ReadFrame(Frame& frame) = 0;
+    virtual ERRNO seekReadFile(unsigned int timeStamp) = 0;
 };
 
 } // namespace Ifmp4
