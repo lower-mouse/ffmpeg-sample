@@ -156,7 +156,8 @@ bool proc()
 {
     Mp4ReaderInterface::Frame frame;
     auto ret = reader_->ReadFrame(frame);
-    if (ret != Mp4ReaderInterface::kOk)
+    if ((ret != Mp4ReaderInterface::kOk && ret != Mp4ReaderInterface::KSampleReadFailed) || 
+    (ret == Mp4ReaderInterface::KSampleReadFailed && frame.type == FrameType::video))
     {
         printf("mp4 read frame failed, ret:%d\n", ret); 
         return false;
@@ -218,7 +219,7 @@ bool proc()
         std::string str(reinterpret_cast<char *>(frame.frame_data), frame.frame_data_len);
         show_info = parseJson(str);
         if(show_info){
-            show_frame_count = 2;
+            show_frame_count = 1;
             for(auto target : show_info->target_list){
                 if(target.target_type == "kengcao"){
 //                    need_suspend = 1;
