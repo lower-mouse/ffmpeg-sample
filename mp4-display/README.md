@@ -19,6 +19,7 @@ ffmepg 相关库
 opencv
 ```
     export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:`pwd`/lib
+    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/home/intellif/work/ffmpeg-sample/output/lib
 ```
 ### 运行
 ./mp4-player [filename]

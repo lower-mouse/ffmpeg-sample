@@ -61,7 +61,8 @@ bool writeFile(void* data, unsigned lenght, std::string file_name){
 
 
 
-
+long long max_gap = 0;
+long long min_gsp = 100000000;
 int need_suspend = 0;
 bool proc()
 {
@@ -84,7 +85,26 @@ bool proc()
     }else if(frame.type == FrameType::gpsInfo){
         std::string tmp(reinterpret_cast<char *>(frame.frame_data), frame.frame_data_len);
         gps_info = tmp;
-        fprintf(stderr, "gps info: %s\n", gps_info.c_str());
+
+        std::string str = gps_info.c_str();
+        
+        auto lenght = str.find(',');
+        if(lenght != std::string::npos){
+            std::string timestamp = str.substr(0, lenght);
+            std::string dev_time = timestamp.substr(0, str.find('@'));
+            std::string gps_time = timestamp.substr(str.find('@') + 1);
+
+            printf("dev_time:%s gps_time:%s\n", dev_time.c_str(), gps_time.c_str());
+            long long gap = std::atoll(dev_time.c_str()) - std::atoll(gps_time.c_str()) - 28800000;
+            if(max_gap < gap){
+                max_gap = gap;
+            }
+
+            if(min_gsp > gap){
+                min_gsp = gap;
+            }
+            fprintf(stderr, "gps info: %s    %lld\n", str.c_str(), gap);
+        }
     }
 
     return true;
@@ -142,6 +162,7 @@ int main(int argc, char** argv)
     while(1){
       auto ret = proc();
       if(!ret){
+        printf("max gap:%lld min gap:%lld\n", max_gap, min_gsp);
         if(fp_){
           fclose(fp_);
           fp_ = NULL;
