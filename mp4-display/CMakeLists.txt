@@ -18,9 +18,12 @@ cmake_minimum_required(VERSION 3.4.1)
 project(mp4-player)
 file(GLOB SRC_FILE "*.cpp")
 
+set(OpenCV_DIR /home/intellif/work/ffmpeg-sample/output/lib/cmake/opencv4)
+
 find_package(OpenCV REQUIRED)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../mp4v2/include
+    /home/intellif/work/ffmpeg-sample/output/include
 )
 
 link_directories(
@@ -29,7 +32,7 @@ link_directories(
     
 add_executable(${PROJECT_NAME} ${SRC_FILE})
     
-target_link_libraries(${PROJECT_NAME} jsoncpp mp4Reader mp4v2 avformat avcodec swresample swscale avutil -llzma  -lbz2 -lz -lm pthread)
+target_link_libraries(${PROJECT_NAME} jsoncpp mp4Reader mp4v2 avformat avcodec swresample swscale avutil -lm pthread)
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} )
 
 
