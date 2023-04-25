@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <jsoncpp/json/json.h>
 
-
 struct target
 {
     int x;
@@ -20,7 +19,8 @@ struct target
     int track_id;
 };
 
-struct customInfo{
+struct customInfo
+{
     int channel_id;
     std::vector<target> target_list;
 };
@@ -30,7 +30,9 @@ typedef std::shared_ptr<customInfo> PcustomInfo;
 int video_frame_count = 0;
 std::shared_ptr<Ifai::Ifmp4::Mp4ReaderInterface> reader_;
 unsigned int time_base = 90000;
-FILE* fp_ = NULL;
+FILE *fp_ = NULL;
+FILE *gps_fp_ = NULL;
+FILE *event_fp_ = NULL;
 int once = 1;
 PcustomInfo show_info;
 std::string gps_info;
@@ -41,8 +43,9 @@ Ifai::Ifmp4::Mp4ReaderInterface::PMp4Info mp4_info;
 using namespace Ifai;
 using namespace Ifmp4;
 
-bool writeFile(void* data, unsigned lenght, std::string file_name){
-    FILE* fp = fopen(file_name.c_str(), "w+");
+bool writeFile(void *data, unsigned lenght, std::string file_name)
+{
+    FILE *fp = fopen(file_name.c_str(), "w+");
     if (fp && data && lenght)
     {
 
@@ -59,81 +62,121 @@ bool writeFile(void* data, unsigned lenght, std::string file_name){
     return true;
 }
 
-
+template <typename T, typename P>
+T remove_if(T beg, T end, P pred)
+{
+    T dest = beg;
+    for (T itr = beg; itr != end; ++itr)
+        if (!pred(*itr))
+            *(dest++) = *itr;
+    return dest;
+}
 
 long long max_gap = 0;
 long long min_gsp = 100000000;
 int need_suspend = 0;
+int gps_index = 0;
 bool proc()
 {
     Mp4ReaderInterface::Frame frame;
     auto ret = reader_->ReadFrame(frame);
-    if ((ret != Mp4ReaderInterface::kOk && ret != Mp4ReaderInterface::KSampleReadFailed) || 
-    (ret == Mp4ReaderInterface::KSampleReadFailed && frame.type == FrameType::video))
+    if ((ret != Mp4ReaderInterface::kOk && ret != Mp4ReaderInterface::KSampleReadFailed) ||
+        (ret == Mp4ReaderInterface::KSampleReadFailed && frame.type == FrameType::video))
     {
-        printf("mp4 read frame failed, ret:%d\n", ret); 
+        printf("mp4 read frame failed, ret:%d\n", ret);
         return false;
     }
 
     if (frame.type == FrameType::video)
     {
-      
     }
-    else if(frame.type == FrameType::eventInfo)
+    else if (frame.type == FrameType::eventInfo)
     {
-    
-    }else if(frame.type == FrameType::gpsInfo){
+        if (event_fp_)
+        {
+            std::string tmp(reinterpret_cast<char *>(frame.frame_data), frame.frame_data_len);
+            tmp.erase(remove_if(tmp.begin(), tmp.end(), isspace), tmp.end());
+            fprintf(event_fp_, "%d: %s\n", gps_index, tmp.c_str());
+        }
+    }
+    else if (frame.type == FrameType::gpsInfo)
+    {
         std::string tmp(reinterpret_cast<char *>(frame.frame_data), frame.frame_data_len);
         gps_info = tmp;
 
         std::string str = gps_info.c_str();
-        
+
         auto lenght = str.find(',');
-        if(lenght != std::string::npos){
+        if (lenght != std::string::npos)
+        {
             std::string timestamp = str.substr(0, lenght);
             std::string dev_time = timestamp.substr(0, str.find('@'));
             std::string gps_time = timestamp.substr(str.find('@') + 1);
+            // if(gps_time.length() == 12){
+            //     // gps_time.push_back('0');
+            //     return true;
+            // }
 
             printf("dev_time:%s gps_time:%s\n", dev_time.c_str(), gps_time.c_str());
             long long gap = std::atoll(dev_time.c_str()) - std::atoll(gps_time.c_str()) - 28800000;
-            if(max_gap < gap){
+            if (max_gap < gap)
+            {
                 max_gap = gap;
             }
 
-            if(min_gsp > gap){
+            if (min_gsp > gap)
+            {
                 min_gsp = gap;
             }
-            fprintf(stderr, "gps info: %s    %lld\n", str.c_str(), gap);
+            // fprintf(stderr, "gps info: %s    %lld\n", str.c_str(), gap);
+            if (gps_fp_)
+            {
+                fprintf(gps_fp_, "%d: %s\n", gps_index, str.substr(str.find('@') + 1).c_str());
+            }
+            gps_index++;
         }
     }
 
     return true;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     std::string path;
+    std::string gps_path;
+    std::string event_path;
     int seek_time = 0;
-    int optc; 
-    while ((optc = getopt(argc, argv, ":s:f:")) != -1) {  
-        // print(optc, argc, argv, optind);  
-        switch (optc) {  
-            case 's':
-                seek_time = std::atoi(optarg);
-                printf("s : optarg:%s seek_time:%d\n", optarg, seek_time);
-                continue;
-            default:  
-                // printf("optarg:%s\n", optarg);
-                continue;  
-        }  
-    }  
-
-    for(int  i = optind; i < argc; i++){
-        printf("remain arg:%s\n", argv[i]);
-        path = argv[i];
+    int optc;
+    while ((optc = getopt(argc, argv, ":s:f:g:e:")) != -1)
+    {
+        // print(optc, argc, argv, optind);
+        switch (optc)
+        {
+        case 's':
+            seek_time = std::atoi(optarg);
+            printf("s : optarg:%s seek_time:%d\n", optarg, seek_time);
+            continue;
+        case 'g':
+            gps_path = optarg;
+            continue;
+        case 'e':
+            event_path = optarg;
+            continue;
+        default:
+            // printf("optarg:%s\n", optarg);
+            continue;
+        }
     }
 
-    if(path.empty()){
+    for (int i = optind; i < argc; i++)
+    {
+        printf("remain arg:%s\n", argv[i]);
+        path = argv[i];
+        break;
+    }
+
+    if (path.empty())
+    {
         printf("usage: input mp4 file\n");
         exit(1);
     }
@@ -157,6 +200,15 @@ int main(int argc, char** argv)
         printf("open output file:%s failed", outfile.c_str());
     }
 
+    if (!event_path.empty())
+    {
+        event_fp_ = fopen(event_path.c_str(), "w+");
+    }
+
+    if (!gps_path.empty())
+    {
+        gps_fp_ = fopen(gps_path.c_str(), "w+");
+    }
     new std::thread([]() -> bool
                     {
     while(1){
@@ -172,7 +224,8 @@ int main(int argc, char** argv)
       }
     } });
 
-    while(1){
+    while (1)
+    {
         sleep(1);
     }
 }

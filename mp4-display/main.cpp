@@ -68,7 +68,7 @@ int show_frame_count = 0;
 int show_frame_index = 0;
 Ifai::Ifmp4::Mp4ReaderInterface::PMp4Info mp4_info;
 
-std::string keep_type;
+std::vector<std::string> keep_type;
 std::string convert_output_path;
 
 bool need_display = false;
@@ -92,6 +92,18 @@ bool writeFile(void* data, unsigned lenght, std::string file_name){
     return true;
 }
 
+std::vector<std::string> g_target_type_map = {
+        "rubbish",
+        "pack_garbage",
+        "rubbish_yes",
+        "rubbish_serious",
+        "rubbish_pack",
+        "hand_trash_bag",
+        "human_headshoulder_area",
+        "hand_area",
+        "trashbox",
+        "junkman"};
+
 PcustomInfo parseJson(std::string& str){
     Json::Reader reader;
     Json::Value root;
@@ -106,8 +118,14 @@ PcustomInfo parseJson(std::string& str){
         for(auto node : root["target"]){
             target t;
             t.target_type = node["target_type"].asString();
-            t.confidence = node["confidence"].asString();
+            // t.confidence = node["confidence"].asString();
             t.track_id = node["track_id"].asInt();
+            if(t.target_type.empty()){
+                unsigned int type = (t.track_id >> 16)&0xffff;
+                t.track_id = t.track_id & 0xffff;
+                t.target_type = g_target_type_map[type];
+            }
+
             t.x = node["x"].asInt();
             t.y = node["y"].asInt();
             t.w = node["w"].asInt();
@@ -189,8 +207,20 @@ bool proc()
                     for(auto target : show_info->target_list){
                         
                         cv::Scalar color = color_array[target.track_id % color_count];
-                        std::string text =  target.target_type + "  confidence:" + target.confidence + "  track_id:" + std::to_string(target.track_id);
-                        // cv::putText(mat, text, cv::Point(target.x, target.y), cv::FONT_HERSHEY_SIMPLEX, 1.5, color, 2);
+                        std::string text =  target.target_type + "  track_id:" + std::to_string(target.track_id);
+
+                        int baseline=0;
+                        cv::Size textSize = getTextSize(text, cv::FONT_HERSHEY_SIMPLEX,
+                                1.5, 2, &baseline);
+
+                        cv::Point text_point((target.x - (textSize.width - target.w)/2 ), target.y + 5);
+                        if(text_point.x + textSize.width > mat.cols){
+                            text_point.x = mat.cols - textSize.width;
+                        }else if(text_point.x <= 0){
+                            text_point.x = 5;
+                        }
+
+                        cv::putText(mat, text, text_point, cv::FONT_HERSHEY_SIMPLEX, 1.5, color, 2);
                         cv::rectangle(mat, cv::Point(target.x, target.y), cv::Point(target.x + target.w, target.y + target.h), color,3);
                     }
                     show_frame_count--;
@@ -225,14 +255,24 @@ bool proc()
         show_info = parseJson(str);
         if(show_info){
             show_frame_count = 1;
+        }
+
+        if(show_info && !keep_type.empty()){
             for(auto target = show_info->target_list.begin(); target != show_info->target_list.end(); ){
                 // printf("target video_frame_count:%d type:%s confidence:%s track_id:%d x y w h:%d %d %d %d\n", video_frame_count, target->target_type.c_str(), target->confidence.c_str(), target->track_id,target->x, target->y, target->w, target->h);
-                if(!keep_type.empty() && target->target_type != keep_type){
+                bool need_keep = false;
+                for(auto type : keep_type){
+                    if(target->target_type == type){
+                        need_keep = true;
+                        break;
+                    }
+                }
+
+                if(!need_keep){
                     target = show_info->target_list.erase(target);
                 }else{
                     target++;
                 }
-
             }            
         }
     }else if(frame.type == FrameType::gpsInfo){
@@ -249,7 +289,7 @@ void usage(int argc, char** argv){
     printf("-s=[seek time]     seek\n");
     printf("-k=[keep_type]     to hide all types except \"keep type\"\n");
     printf("-o=[file_name]     save to h264 file\n");
-    printf("-n                 play video in sceen\n");
+    printf("-p                 play video in sceen\n");
 }
 
 int main(int argc, char** argv)
@@ -266,7 +306,8 @@ int main(int argc, char** argv)
                 continue;
             case 'k':
                 printf("k : optarg:%s \n", optarg);
-                keep_type = optarg;
+                // keep_type = optarg;
+                keep_type.push_back(optarg);
                 continue;
             case 'o':
                 printf("o : optarg:%s \n", optarg);
@@ -274,7 +315,7 @@ int main(int argc, char** argv)
                 continue;
             case 'p':
                 need_display = true;
-                printf("n : need_display\n");
+                printf("p : need_display\n");
                 continue;
             case 'h':
                 usage(argc, argv);

@@ -23,6 +23,7 @@ AVFrame* cvmatToAvframe(cv::Mat* image, AVFrame * frame){
     if (frame == NULL){  
         frame = av_frame_alloc();  
         av_image_alloc(frame->data, frame->linesize, width, height, AVPixelFormat::AV_PIX_FMT_YUV420P, 1);  
+        // av_image_alloc(frame->data, frame->linesize, width, height, AVPixelFormat::AV_PIX_FMT_YUVJ420P, 1);  
     }  
     SwsContext* conversion = sws_getContext(width, height, AVPixelFormat::AV_PIX_FMT_BGR24, width, height, (AVPixelFormat) frame->format, SWS_FAST_BILINEAR, NULL, NULL, NULL);  
     sws_scale(conversion, &image->data, cvLinesizes , 0, height, frame->data, frame->linesize);  
@@ -57,7 +58,9 @@ void Encoder::encode(AVCodecContext *enc_ctx, AVFrame *frame, AVPacket *pkt,
             exit(1);
         }
         printf("Write packet %3"PRId64" (size=%5d)\n", pkt->pts, pkt->size);
-        fwrite(pkt->data, 1, pkt->size, outfile);
+        if(pkt->size != fwrite(pkt->data, 1, pkt->size, outfile)){
+            fprintf(stderr, " fwrite failed, errno:%d\n", errno);
+        }
         av_packet_unref(pkt);
     }
 }
@@ -71,7 +74,7 @@ Encoder::~Encoder(){
 }
 
 int Encoder::init(const std::string& file_name, int width, int height, int frame_rate){
-    codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+    codec = avcodec_find_encoder(AV_CODEC_ID_H265);
     if (!codec) {
         fprintf(stderr, "Codec h.264 not found\n");
         exit(1);
@@ -85,7 +88,7 @@ int Encoder::init(const std::string& file_name, int width, int height, int frame
     if (!pkt)
         exit(1);
     /* put sample parameters */
-    c->bit_rate = 400000;
+    c->bit_rate = 5000000;
     /* resolution must be a multiple of two */
     c->width  = width;
     c->height = height;
@@ -101,6 +104,7 @@ int Encoder::init(const std::string& file_name, int width, int height, int frame
     c->gop_size = 10;
     c->max_b_frames = 1;
     c->pix_fmt = AV_PIX_FMT_YUV420P;
+    // c->pix_fmt = AV_PIX_FMT_YUVJ420P;
     if (codec->id == AV_CODEC_ID_H264)
         av_opt_set(c->priv_data, "preset", "slow", 0);
     /* open it */
